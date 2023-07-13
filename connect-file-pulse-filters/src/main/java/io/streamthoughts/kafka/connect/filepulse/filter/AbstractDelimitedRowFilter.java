@@ -148,12 +148,13 @@ public abstract class AbstractDelimitedRowFilter<T extends AbstractRecordFilter<
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.<String>counting()))
                     .entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> {
-                        return e.getValue() > 1 ? Schema.array(DEFAULT_COLUMN_TYPE) : DEFAULT_COLUMN_TYPE;
+                    .collect(Collectors.toMap(e -> getFieldName(e.getKey()), e -> {
+                        Schema type = getFieldType(e.getKey());
+                        return e.getValue() > 1 ? Schema.array(type) : type;
                     }))
                     .forEach(schema::field);
             } else {
-                columns.forEach(columnName -> schema.field(columnName, DEFAULT_COLUMN_TYPE));
+                columns.forEach(column -> schema.field(getFieldName(column), getFieldType(column)));
             }
             IntStream.range(0, columns.size()).forEach(i -> columnsTypesByIndex.put(i, schema.field(columns.get(i))));
             return;
@@ -169,6 +170,24 @@ public abstract class AbstractDelimitedRowFilter<T extends AbstractRecordFilter<
         }
 
         throw new FilterException("Can't found valid configuration to determine schema for input value");
+    }
+
+    private String getFieldName(String column) {
+        String fieldName = column;
+        if(column.contains(":")) {
+            String[] nameAndType = column.split(":");
+            fieldName = nameAndType[0];
+        }
+        return fieldName;
+    }
+
+    private Schema getFieldType(String column) {
+        Schema fieldType = DEFAULT_COLUMN_TYPE;
+        if(column.contains(":")) {
+            String[] nameAndType = column.split(":");
+            fieldType = Schema.of(Type.forName(nameAndType[1].toUpperCase()));
+        }
+        return fieldType;
     }
 
     private TypedStruct buildStructForFields(final String[] fieldValues) {
